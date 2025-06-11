@@ -7,8 +7,9 @@ const SHEET_NAME = "Sessions"; // คุณต้องสร้างชีต�
 
 async function getSheetsClient() {
   const auth = new google.auth.GoogleAuth({
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-  });
+  keyFile: "/etc/secrets/credentials.json", // path ที่เราตั้งไว้ตอนอัปโหลด
+  scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+});
   const authClient = await auth.getClient();
   return google.sheets({ version: "v4", auth: authClient });
 }
