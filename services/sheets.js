@@ -1,5 +1,4 @@
 const { google } = require('googleapis');
-const path = require('path');
 
 const auth = new google.auth.GoogleAuth({
   credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON),
@@ -21,20 +20,20 @@ async function getRecipesFromSheet() {
   return rows ? rows.map((row) => row[0]) : [];
 }
 
-async function appendOrderToSheet(data) {
+async function saveOrderToSheets(_, data) {
   const client = await auth.getClient();
   const sheets = google.sheets({ version: 'v4', auth: client });
 
   const values = [[
-    data.nickname,
-    data.phone,
-    data.recipe,
-    data.type,
-    data.amount,
-    data.delivery,
-    data.location,
-    data.datetime,
-    data.notes,
+    data["ชื่อเล่น"] || "",
+    data["เบอร์โทร"] || "",
+    data["สูตร"] || "",
+    data["ประเภท"] || "",
+    data["ปริมาณ"] || "",
+    data["วิธีรับของ"] || "",
+    data["สถานที่จัดส่ง"] || "",
+    data["วันเวลารับของ"] || "",
+    data["ข้อความเพิ่มเติม"] || "",
     new Date().toISOString()
   ]];
 
@@ -46,5 +45,7 @@ async function appendOrderToSheet(data) {
   });
 }
 
-module.exports = { getRecipesFromSheet, appendOrderToSheet };
-//refactor: use env for Google credentials
+module.exports = {
+  getRecipesFromSheet,
+  saveOrderToSheets,
+};
