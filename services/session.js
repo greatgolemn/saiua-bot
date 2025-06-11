@@ -1,14 +1,37 @@
+// session.js
+// ใช้เก็บสถานะการสั่งซื้อของแต่ละผู้ใช้ใน memory
+
 const sessions = {};
 
-function getSession(senderId) {
-  if (!sessions[senderId]) {
-    sessions[senderId] = { step: 0, data: {} };
-  }
-  return sessions[senderId];
+function initSession(userId) {
+  sessions[userId] = {
+    step: 0,
+    data: {}
+  };
 }
 
-function resetSession(senderId) {
-  delete sessions[senderId];
+function getSession(userId) {
+  return sessions[userId];
 }
 
-module.exports = { getSession, resetSession };
+function updateSession(userId, key, value) {
+  if (!sessions[userId]) initSession(userId);
+  sessions[userId].data[key] = value;
+}
+
+function nextStep(userId) {
+  if (!sessions[userId]) initSession(userId);
+  sessions[userId].step += 1;
+}
+
+function resetSession(userId) {
+  delete sessions[userId];
+}
+
+module.exports = {
+  initSession,
+  getSession,
+  updateSession,
+  nextStep,
+  resetSession,
+};
