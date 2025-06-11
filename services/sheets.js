@@ -1,3 +1,4 @@
+
 const { google } = require('googleapis');
 
 const auth = new google.auth.GoogleAuth({
@@ -6,19 +7,6 @@ const auth = new google.auth.GoogleAuth({
 });
 
 const SHEET_ID = process.env.SHEET_ID;
-
-async function getRecipesFromSheet() {
-  const client = await auth.getClient();
-  const sheetsAPI = google.sheets({ version: 'v4', auth: client });
-
-  const response = await sheetsAPI.spreadsheets.values.get({
-    spreadsheetId: SHEET_ID,
-    range: 'Recipes!A2:A',
-  });
-
-  const rows = response.data.values;
-  return rows ? rows.map((row) => row[0]) : [];
-}
 
 async function saveOrderToSheets(_, data) {
   const client = await auth.getClient();
@@ -45,7 +33,4 @@ async function saveOrderToSheets(_, data) {
   });
 }
 
-module.exports = {
-  getRecipesFromSheet,
-  saveOrderToSheets,
-};
+module.exports = { saveOrderToSheets };
