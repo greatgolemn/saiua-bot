@@ -44,7 +44,7 @@ router.post("/", async (req, res) => {
 
 // handle message
 async function handleMessage(senderPsid, receivedMessage) {
-  const session = getSession(senderPsid);
+  const session = getSession(senderPsid) || { step: 0 }; // ✅ ป้องกัน undefined
   const text = receivedMessage.text?.trim();
 
   if (!text) return;
