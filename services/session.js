@@ -1,81 +1,129 @@
-const { GoogleSpreadsheet } = require('google-spreadsheet');
+// session.js
+// ใช้เก็บสถานะการสั่งซื้อของแต่ละผู้ใช้ใน Google Sheets
 
-const sessions = {};
+const { google } = require("googleapis");
+const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
+const SHEET_NAME = "Sessions"; // คุณต้องสร้างชีตนี้ไว้ใน Google Sheets
 
-// ✅ โหลดเอกสารจาก Google Sheets ด้วย env
-async function loadSheet() {
-  const doc = new GoogleSpreadsheet(process.env.SPREADSHEET_ID);
-  const creds = JSON.parse(process.env.GOOGLE_CREDENTIALS);
-  await doc.useServiceAccountAuth(creds);
-  await doc.loadInfo();
-  return doc.sheetsByIndex[0]; // ใช้ sheet แรก
+async function getSheetsClient() {
+  const auth = new google.auth.GoogleAuth({
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+  });
+  const authClient = await auth.getClient();
+  return google.sheets({ version: "v4", auth: authClient });
 }
 
-function initSession(userId) {
-  sessions[userId] = {
-    step: 0,
-    data: {},
-  };
-}
-
-function getSession(userId) {
-  if (!sessions[userId]) initSession(userId);
-  return sessions[userId];
-}
-
-function updateSession(userId, updates) {
-  if (!sessions[userId]) {
-    sessions[userId] = { step: 0, data: {} };
-  }
-
-  // ถ้ามี step ให้ set ลง sessions[userId].step
-  if (updates.step !== undefined) {
-    sessions[userId].step = updates.step;
-  }
-
-  // merge data อื่น ๆ ลงไป
-  sessions[userId].data = {
-    ...sessions[userId].data,
-    ...updates,
-  };
-}
-
-function nextStep(userId) {
-  if (!sessions[userId]) initSession(userId);
-  sessions[userId].step += 1;
-}
-
-function resetSession(userId) {
-  delete sessions[userId];
-}
-
-// ✅ เพิ่ม: บันทึกข้อมูลลง Google Sheets
-async function saveToGoogleSheet(userId) {
-  const sheet = await loadSheet();
-  const session = sessions[userId];
-  if (!session) return;
-
-  const data = session.data;
-
-  await sheet.addRow({
-    Timestamp: new Date().toLocaleString('th-TH'),
-    Product: data.product || '',
-    Type: data.type || '',
-    Amount: data.amount || '',
-    Name: data.name || '',
-    Phone: data.phone || '',
-    Delivery: data.delivery || '',
-    Location: data.location || '',
-    DateTime: data.date || '',
-    Note: data.note || '',
+async function initSession(userId) {
+  const sheets = await getSheetsClient();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${SHEET_NAME}!A1`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [[userId, 0, JSON.stringify({})]],
+    },
   });
 }
 
+async function getSession(userId) {
+  const sheets = await getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: SHEET_NAME,
+  });
+
+  const rows = res.data.values || [];
+  for (const row of rows) {
+    if (row[0] === userId) {
+      return {
+        step: parseInt(row[1], 10),
+        ...JSON.parse(row[2] || "{}"),
+      };
+    }
+  }
+  await initSession(userId);
+  return { step: 0 };
+}
+
+async function updateSession(userId, key, value) {
+  const sheets = await getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: SHEET_NAME,
+  });
+
+  const rows = res.data.values || [];
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i][0] === userId) {
+      const currentStep = parseInt(rows[i][1], 10);
+      const currentData = JSON.parse(rows[i][2] || "{}");
+      currentData[key] = value;
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SHEET_NAME}!A${i + 1}:C${i + 1}`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: {
+          values: [[userId, currentStep, JSON.stringify(currentData)]],
+        },
+      });
+      return;
+    }
+  }
+  await initSession(userId);
+  await updateSession(userId, key, value);
+}
+
+async function nextStep(userId) {
+  const sheets = await getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: SHEET_NAME,
+  });
+
+  const rows = res.data.values || [];
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i][0] === userId) {
+      const newStep = parseInt(rows[i][1], 10) + 1;
+      const currentData = rows[i][2];
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SHEET_NAME}!A${i + 1}:C${i + 1}`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: {
+          values: [[userId, newStep, currentData]],
+        },
+      });
+      return;
+    }
+  }
+}
+
+async function resetSession(userId) {
+  const sheets = await getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: SHEET_NAME,
+  });
+
+  const rows = res.data.values || [];
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i][0] === userId) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SHEET_NAME}!A${i + 1}:C${i + 1}`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: {
+          values: [[userId, 0, JSON.stringify({})]],
+        },
+      });
+      return;
+    }
+  }
+}
+
 module.exports = {
-  initSession,
   getSession,
   updateSession,
   nextStep,
   resetSession,
-  saveToGoogleSheet, // ✅ export ไปใช้ตอน "ยืนยัน"
 };
