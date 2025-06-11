@@ -23,9 +23,21 @@ function getSession(userId) {
   return sessions[userId];
 }
 
-function updateSession(userId, key, value) {
-  if (!sessions[userId]) initSession(userId);
-  sessions[userId].data[key] = value;
+function updateSession(userId, updates) {
+  if (!sessions[userId]) {
+    sessions[userId] = { step: 0, data: {} };
+  }
+
+  // ถ้ามี step ให้ set ลง sessions[userId].step
+  if (updates.step !== undefined) {
+    sessions[userId].step = updates.step;
+  }
+
+  // merge data อื่น ๆ ลงไป
+  sessions[userId].data = {
+    ...sessions[userId].data,
+    ...updates,
+  };
 }
 
 function nextStep(userId) {
