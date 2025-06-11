@@ -6,7 +6,6 @@ const { saveOrderToSheets } = require("../services/sheets");
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const axios = require("axios");
 
-// webhook verification
 router.get("/", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
@@ -22,7 +21,6 @@ router.get("/", (req, res) => {
   }
 });
 
-// webhook message handler
 router.post("/", async (req, res) => {
   const body = req.body;
 
@@ -53,81 +51,60 @@ async function handleMessage(senderPsid, receivedMessage) {
 
     const session = await getSession(senderPsid);
 
-    // Step 0: เริ่มต้น - ถามสูตร
     if (!session.step || session.step === 0) {
       await callSendAPI(senderPsid, {
-        text: "คุณอยากสั่งสูตรแบบไหนครับ?
-- กลมกล่อม
-- ปรับสูตรเอง",
+        text: "คุณอยากสั่งสูตรแบบไหนครับ?\n- กลมกล่อม\n- ปรับสูตรเอง",
       });
       await nextStep(senderPsid);
-    }
-    // Step 1: เก็บสูตร
-    else if (session.step === 1) {
+    } else if (session.step === 1) {
       await updateSession(senderPsid, "สูตร", text);
       await nextStep(senderPsid);
       await callSendAPI(senderPsid, {
         text: "เลือกประเภท: พร้อมทาน หรือ ซีลสุญญากาศ ครับ~",
       });
-    }
-    // Step 2: เก็บประเภท
-    else if (session.step === 2) {
+    } else if (session.step === 2) {
       await updateSession(senderPsid, "ประเภท", text);
       await nextStep(senderPsid);
       await callSendAPI(senderPsid, {
         text: "ต้องการกี่กิโลกรัมครับ?",
       });
-    }
-    // Step 3: ปริมาณ
-    else if (session.step === 3) {
+    } else if (session.step === 3) {
       await updateSession(senderPsid, "ปริมาณ", text);
       await nextStep(senderPsid);
       await callSendAPI(senderPsid, {
         text: "ชื่อเล่นของคุณคืออะไรครับ?",
       });
-    }
-    // Step 4: ชื่อเล่น
-    else if (session.step === 4) {
+    } else if (session.step === 4) {
       await updateSession(senderPsid, "ชื่อเล่น", text);
       await nextStep(senderPsid);
       await callSendAPI(senderPsid, {
         text: "เบอร์โทรติดต่อได้คืออะไรครับ?",
       });
-    }
-    // Step 5: เบอร์โทร
-    else if (session.step === 5) {
+    } else if (session.step === 5) {
       await updateSession(senderPsid, "เบอร์โทร", text);
       await nextStep(senderPsid);
       await callSendAPI(senderPsid, {
         text: "ต้องการนัดรับหรือจัดส่งดีครับ?",
       });
-    }
-    // Step 6: วิธีรับของ
-    else if (session.step === 6) {
+    } else if (session.step === 6) {
       await updateSession(senderPsid, "วิธีรับของ", text);
       await nextStep(senderPsid);
       await callSendAPI(senderPsid, {
         text: "ระบุพิกัดหรือที่อยู่จัดส่งให้บ่าวน้อยหน่อยนะครับ~",
       });
-    }
-    // Step 7: ที่อยู่
-    else if (session.step === 7) {
+    } else if (session.step === 7) {
       await updateSession(senderPsid, "สถานที่จัดส่ง", text);
       await nextStep(senderPsid);
       await callSendAPI(senderPsid, {
         text: "วันที่และเวลาที่อยากรับของคือเมื่อไหร่ดีครับ?",
       });
-    }
-    // Step 8: วันเวลา
-    else if (session.step === 8) {
+    } else if (session.step === 8) {
       await updateSession(senderPsid, "วันเวลารับของ", text);
       await nextStep(senderPsid);
       await callSendAPI(senderPsid, {
         text: "มีอะไรอยากบอกเพิ่มเติมถึงร้านมั้ยครับ?",
       });
-    }
-    // Step 9: ข้อความเพิ่มเติม
-    else if (session.step === 9) {
+    } else if (session.step === 9) {
       await updateSession(senderPsid, "ข้อความเพิ่มเติม", text);
       const finalSession = await getSession(senderPsid);
       const summary = Object.entries(finalSession)
@@ -135,12 +112,10 @@ async function handleMessage(senderPsid, receivedMessage) {
         .join("\n");
 
       await callSendAPI(senderPsid, {
-        text: `สรุปออเดอร์ของคุณ:\n${summary}\n\nพิมพ์ว่า "ยืนยัน" เพื่อยืนยัน หรือ "เริ่มใหม่" หากต้องการแก้ไขครับ~`,
+        text: `สรุปออเดอร์ของคุณ:\n${summary}\n\nพิมพ์ว่า \"ยืนยัน\" เพื่อยืนยัน หรือ \"เริ่มใหม่\" หากต้องการแก้ไขครับ~`,
       });
       await nextStep(senderPsid);
-    }
-    // Step 10: ยืนยัน
-    else if (session.step === 10) {
+    } else if (session.step === 10) {
       if (/^ยืนยัน$/i.test(text)) {
         const finalSession = await getSession(senderPsid);
         await saveOrderToSheets(senderPsid, finalSession);
@@ -154,9 +129,7 @@ async function handleMessage(senderPsid, receivedMessage) {
         });
         await resetSession(senderPsid);
       }
-    }
-    // ไม่เข้าเงื่อนไข = ให้ GPT ตอบ
-    else {
+    } else {
       const reply = await generateGPTReply(text);
       await callSendAPI(senderPsid, { text: reply });
     }
