@@ -2,7 +2,7 @@ const { google } = require('googleapis');
 const path = require('path');
 
 const auth = new google.auth.GoogleAuth({
-  keyFile: path.join(__dirname, '../credentials.json'),
+  credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON),
   scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
@@ -47,3 +47,4 @@ async function appendOrderToSheet(data) {
 }
 
 module.exports = { getRecipesFromSheet, appendOrderToSheet };
+refactor: use env for Google credentials
