@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const generateGPTReply = require("../services/chatgpt");
-const { getSession, updateSession, nextStep, resetSession } = require("../services/session");
+const { getSession, updateSession, resetSession } = require("../services/session");
 const { saveOrderToSheets } = require("../services/sheets");
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const axios = require("axios");
@@ -10,14 +10,11 @@ router.get("/", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
-
-  if (mode && token) {
-    if (mode === "subscribe" && token === VERIFY_TOKEN) {
-      console.log("WEBHOOK_VERIFIED");
-      res.status(200).send(challenge);
-    } else {
-      res.sendStatus(403);
-    }
+  if (mode && token && mode === "subscribe" && token === VERIFY_TOKEN) {
+    console.log("WEBHOOK_VERIFIED");
+    res.status(200).send(challenge);
+  } else {
+    res.sendStatus(403);
   }
 });
 
@@ -33,7 +30,6 @@ router.post("/", async (req, res) => {
         await handleMessage(senderPsid, webhookEvent.message);
       }
     }
-
     res.status(200).send("EVENT_RECEIVED");
   } else {
     res.sendStatus(404);
@@ -49,89 +45,42 @@ async function handleMessage(senderPsid, receivedMessage) {
       });
     }
 
-    const session = await getSession(senderPsid);
+    let session = await getSession(senderPsid);
+    if (!session.data) session.data = {};
 
-    if (!session.step || session.step === 0) {
-      await callSendAPI(senderPsid, {
-        text: "คุณอยากสั่งสูตรแบบไหนครับ?\n- กลมกล่อม\n- ปรับสูตรเอง",
-      });
-      await nextStep(senderPsid);
-    } else if (session.step === 1) {
-      await updateSession(senderPsid, "สูตร", text);
-      await nextStep(senderPsid);
-      await callSendAPI(senderPsid, {
-        text: "เลือกประเภท: พร้อมทาน หรือ ซีลสุญญากาศ ครับ~",
-      });
-    } else if (session.step === 2) {
-      await updateSession(senderPsid, "ประเภท", text);
-      await nextStep(senderPsid);
-      await callSendAPI(senderPsid, {
-        text: "ต้องการกี่กิโลกรัมครับ?",
-      });
-    } else if (session.step === 3) {
-      await updateSession(senderPsid, "ปริมาณ", text);
-      await nextStep(senderPsid);
-      await callSendAPI(senderPsid, {
-        text: "ชื่อเล่นของคุณคืออะไรครับ?",
-      });
-    } else if (session.step === 4) {
-      await updateSession(senderPsid, "ชื่อเล่น", text);
-      await nextStep(senderPsid);
-      await callSendAPI(senderPsid, {
-        text: "เบอร์โทรติดต่อได้คืออะไรครับ?",
-      });
-    } else if (session.step === 5) {
-      await updateSession(senderPsid, "เบอร์โทร", text);
-      await nextStep(senderPsid);
-      await callSendAPI(senderPsid, {
-        text: "ต้องการนัดรับหรือจัดส่งดีครับ?",
-      });
-    } else if (session.step === 6) {
-      await updateSession(senderPsid, "วิธีรับของ", text);
-      await nextStep(senderPsid);
-      await callSendAPI(senderPsid, {
-        text: "ระบุพิกัดหรือที่อยู่จัดส่งให้บ่าวน้อยหน่อยนะครับ~",
-      });
-    } else if (session.step === 7) {
-      await updateSession(senderPsid, "สถานที่จัดส่ง", text);
-      await nextStep(senderPsid);
-      await callSendAPI(senderPsid, {
-        text: "วันที่และเวลาที่อยากรับของคือเมื่อไหร่ดีครับ?",
-      });
-    } else if (session.step === 8) {
-      await updateSession(senderPsid, "วันเวลารับของ", text);
-      await nextStep(senderPsid);
-      await callSendAPI(senderPsid, {
-        text: "มีอะไรอยากบอกเพิ่มเติมถึงร้านมั้ยครับ?",
-      });
-    } else if (session.step === 9) {
-      await updateSession(senderPsid, "ข้อความเพิ่มเติม", text);
-      const finalSession = await getSession(senderPsid);
-      const summary = Object.entries(finalSession)
-        .map(([key, value]) => `• ${key}: ${value}`)
-        .join("\n");
+    // ส่งคำถามของลูกค้า + session ปัจจุบันไปให้ GPT วิเคราะห์และตอบกลับ
+    const gptResponse = await generateGPTReply(text, session.data);
 
-      await callSendAPI(senderPsid, {
-        text: `สรุปออเดอร์ของคุณ:\n${summary}\n\nพิมพ์ว่า \"ยืนยัน\" เพื่อยืนยัน หรือ \"เริ่มใหม่\" หากต้องการแก้ไขครับ~`,
-      });
-      await nextStep(senderPsid);
-    } else if (session.step === 10) {
-      if (/^ยืนยัน$/i.test(text)) {
-        const finalSession = await getSession(senderPsid);
-        await saveOrderToSheets(senderPsid, finalSession);
-        await callSendAPI(senderPsid, {
-          text: "รับออเดอร์เรียบร้อย ขอบคุณครับ! บ่าวน้อยจะเตรียมให้อย่างดีที่สุดเลย~",
-        });
-        await resetSession(senderPsid);
-      } else {
-        await callSendAPI(senderPsid, {
-          text: "บ่าวน้อยล้างข้อมูลให้นะครับ เริ่มต้นใหม่เลย~",
-        });
-        await resetSession(senderPsid);
+    // ถ้ามีการสั่งให้ reset
+    if (gptResponse.resetSession) {
+      await resetSession(senderPsid);
+    }
+
+    // ถ้ามีการอัปเดตข้อมูลใน session
+    if (gptResponse.updatedFields) {
+      for (const [key, value] of Object.entries(gptResponse.updatedFields)) {
+        await updateSession(senderPsid, key, value);
       }
+    }
+
+    // ถ้า GPT บอกว่าให้บันทึกออเดอร์
+    if (gptResponse.confirmOrder) {
+      const finalSession = await getSession(senderPsid);
+      await saveOrderToSheets(senderPsid, finalSession.data);
+      await callSendAPI(senderPsid, {
+        text: "บ่าวน้อยบันทึกออเดอร์เรียบร้อยแล้วนะครับ ขอบคุณมาก ๆ เลย~ 🐷",
+      });
+      await resetSession(senderPsid);
+      return;
+    }
+
+    // ส่งข้อความกลับจาก GPT
+    if (gptResponse.reply) {
+      await callSendAPI(senderPsid, { text: gptResponse.reply });
     } else {
-      const reply = await generateGPTReply(text);
-      await callSendAPI(senderPsid, { text: reply });
+      await callSendAPI(senderPsid, {
+        text: "บ่าวน้อยงงนิดหน่อย ขอให้พิมพ์ใหม่อีกทีได้มั้ยครับ~",
+      });
     }
   } catch (err) {
     console.error("🔥 ERROR in handleMessage:", err.stack || err.message || err);
