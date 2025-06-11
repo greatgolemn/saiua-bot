@@ -2,7 +2,7 @@
 // ใช้เก็บสถานะการสั่งซื้อของแต่ละผู้ใช้ใน Google Sheets
 
 const { google } = require("googleapis");
-const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
+const SPREADSHEET_ID = process.env.SHEET_ID;
 const SHEET_NAME = "Sessions"; // คุณต้องสร้างชีตนี้ไว้ใน Google Sheets
 
 async function getSheetsClient() {
