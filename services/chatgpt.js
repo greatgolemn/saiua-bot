@@ -39,8 +39,7 @@ async function generateGPTReply(messageText) {
 module.exports = generateGPTReply;
 
 
-// === 📁 routes/webhook.js (เฉพาะส่วนที่ต้องเปลี่ยน) ===
-const generateGPTReply = require("../services/chatgpt");
+
 
 // ให้แน่ใจว่า handleMessage() เป็น async
 async function handleMessage(senderPsid, receivedMessage) {
