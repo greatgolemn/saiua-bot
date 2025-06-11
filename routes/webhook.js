@@ -44,60 +44,69 @@ router.post("/", async (req, res) => {
 
 async function handleMessage(senderPsid, receivedMessage) {
   try {
+    const text = receivedMessage.text;
+    if (!text) {
+      return callSendAPI(senderPsid, {
+        text: "ตอนนี้ยังไม่รองรับรูปภาพหรือเสียงนะครับ ลองพิมพ์เข้ามาใหม่ได้เลย~",
+      });
+    }
+
     const session = await getSession(senderPsid);
 
     if (!session.step || session.step === 0) {
-      await updateSession(senderPsid, "สูตร", receivedMessage.text);
+      await updateSession(senderPsid, "สูตร", text);
       await nextStep(senderPsid);
       callSendAPI(senderPsid, { text: "เลือกประเภท: พร้อมทาน หรือ ซีลสุญญากาศ" });
     } else if (session.step === 1) {
-      await updateSession(senderPsid, "ประเภท", receivedMessage.text);
+      await updateSession(senderPsid, "ประเภท", text);
       await nextStep(senderPsid);
       callSendAPI(senderPsid, { text: "ต้องการกี่กิโลกรัมครับ" });
     } else if (session.step === 2) {
-      await updateSession(senderPsid, "ปริมาณ", receivedMessage.text);
+      await updateSession(senderPsid, "ปริมาณ", text);
       await nextStep(senderPsid);
       callSendAPI(senderPsid, { text: "ชื่อเล่นของคุณ?" });
     } else if (session.step === 3) {
-      await updateSession(senderPsid, "ชื่อเล่น", receivedMessage.text);
+      await updateSession(senderPsid, "ชื่อเล่น", text);
       await nextStep(senderPsid);
       callSendAPI(senderPsid, { text: "เบอร์โทรติดต่อได้?" });
     } else if (session.step === 4) {
-      await updateSession(senderPsid, "เบอร์โทร", receivedMessage.text);
+      await updateSession(senderPsid, "เบอร์โทร", text);
       await nextStep(senderPsid);
       callSendAPI(senderPsid, { text: "ต้องการนัดรับหรือจัดส่ง?" });
     } else if (session.step === 5) {
-      await updateSession(senderPsid, "วิธีรับของ", receivedMessage.text);
+      await updateSession(senderPsid, "วิธีรับของ", text);
       await nextStep(senderPsid);
       callSendAPI(senderPsid, { text: "ระบุพิกัดหรือที่อยู่จัดส่ง" });
     } else if (session.step === 6) {
-      await updateSession(senderPsid, "สถานที่จัดส่ง", receivedMessage.text);
+      await updateSession(senderPsid, "สถานที่จัดส่ง", text);
       await nextStep(senderPsid);
       callSendAPI(senderPsid, { text: "วันที่และเวลาที่ต้องการรับของ?" });
     } else if (session.step === 7) {
-      await updateSession(senderPsid, "วันเวลารับของ", receivedMessage.text);
+      await updateSession(senderPsid, "วันเวลารับของ", text);
       await nextStep(senderPsid);
       callSendAPI(senderPsid, { text: "มีอะไรอยากบอกเพิ่มเติมถึงร้านมั้ยครับ?" });
     } else if (session.step === 8) {
-      await updateSession(senderPsid, "ข้อความเพิ่มเติม", receivedMessage.text);
+      await updateSession(senderPsid, "ข้อความเพิ่มเติม", text);
       const finalSession = await getSession(senderPsid);
       const summary = Object.entries(finalSession)
         .map(([key, value]) => `• ${key}: ${value}`)
         .join("\n");
 
       callSendAPI(senderPsid, {
-        text: `สรุปออเดอร์ของคุณ:\n${summary}\n\nยืนยันพิมพ์ว่า \"ยืนยัน\" หรือ \"เริ่มใหม่\" หากต้องการแก้ไข`
+        text: `สรุปออเดอร์ของคุณ:\n${summary}\n\nยืนยันพิมพ์ว่า "ยืนยัน" หรือ "เริ่มใหม่" หากต้องการแก้ไข`,
       });
       await nextStep(senderPsid);
     } else if (session.step === 9) {
-      if (/^ยืนยัน$/i.test(receivedMessage.text)) {
-        // ✅ บันทึก Google Sheets (ยังไม่เขียน)
+      if (/^ยืนยัน$/i.test(text)) {
         callSendAPI(senderPsid, { text: "รับออเดอร์เรียบร้อย ขอบคุณครับ!" });
         await resetSession(senderPsid);
       } else {
         callSendAPI(senderPsid, { text: "ยกเลิกออเดอร์ และเริ่มต้นใหม่ครับ~" });
         await resetSession(senderPsid);
       }
+    } else {
+      const reply = await generateGPTReply(text);
+      callSendAPI(senderPsid, { text: reply });
     }
   } catch (err) {
     console.error("handleMessage error:", err);
